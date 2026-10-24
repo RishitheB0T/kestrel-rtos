@@ -1,0 +1,4 @@
+build/
+tests/host/test_nn
+__pycache__/
+*.pyc
