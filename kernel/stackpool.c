@@ -14,20 +14,20 @@
 
 extern uint32_t _stacks_start, _stacks_end;
 
-static uint32_t used_bitmap; /* bit i = unit i in use (32 units = 16 KiB+) */
+static uint64_t used_bitmap; /* bit i = unit i in use (64 units = 32 KiB) */
 static uint32_t num_units;
 
 void k_stack_pool_init(void)
 {
     num_units = ((uint32_t)&_stacks_end - (uint32_t)&_stacks_start) / UNIT;
-    if (num_units > 32)
-        num_units = 32;
+    if (num_units > 64)
+        num_units = 64;
     used_bitmap = 0;
 }
 
-static uint32_t run_mask(uint32_t first, uint32_t count)
+static uint64_t run_mask(uint32_t first, uint32_t count)
 {
-    uint32_t bits = count >= 32 ? 0xFFFFFFFFu : ((1u << count) - 1u);
+    uint64_t bits = count >= 64 ? ~0ull : ((1ull << count) - 1u);
     return bits << first;
 }
 
@@ -39,7 +39,7 @@ uint32_t *k_stack_alloc(uint32_t size)
         uint32_t addr = base + first * UNIT;
         if (addr & (size - 1u))
             continue; /* not aligned to its own size */
-        uint32_t mask = run_mask(first, count);
+        uint64_t mask = run_mask(first, count);
         if (!(used_bitmap & mask)) {
             used_bitmap |= mask;
             return (uint32_t *)addr;
