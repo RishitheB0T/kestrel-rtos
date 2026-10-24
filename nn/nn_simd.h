@@ -46,11 +46,13 @@ static inline int32_t smlad(uint32_t a, uint32_t b, int32_t acc)
 }
 #endif
 
-/* Unaligned-safe 32-bit load; compiles to a single LDR on Cortex-M4. */
+/* Unaligned-safe 32-bit load; compiles to a single LDR on Cortex-M4.
+ * (__builtin_memcpy, because -ffreestanding turns plain memcpy into a real
+ * function call - which once made the "fast" kernel 2x slower than naive.) */
 static inline uint32_t rd32(const void *p)
 {
     uint32_t v;
-    memcpy(&v, p, 4);
+    __builtin_memcpy(&v, p, 4);
     return v;
 }
 
