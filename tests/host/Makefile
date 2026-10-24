@@ -8,6 +8,7 @@ SRCS := test_nn.c $(ROOT)/nn/nn_kernels.c $(ROOT)/nn/model_gen.c $(ROOT)/nn/test
 
 run: test_nn
 	./test_nn
+	python3 test_memplan.py
 
 test_nn: $(SRCS) $(ROOT)/nn/nn.h $(ROOT)/nn/nn_simd.h $(ROOT)/nn/model_gen.h
 	$(CC) $(CFLAGS) $(SRCS) -o $@
