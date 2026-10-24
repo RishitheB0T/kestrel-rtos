@@ -199,6 +199,7 @@ static int32_t sys_reboot(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3)
     SCB_AIRCR = AIRCR_SYSRESET;
     for (;;) {
     }
+    return K_OK; /* not reached */
 }
 
 static int32_t sys_halt(uint32_t code, uint32_t a1, uint32_t a2, uint32_t a3)
@@ -209,6 +210,7 @@ static int32_t sys_halt(uint32_t code, uint32_t a1, uint32_t a2, uint32_t a3)
     __asm volatile("cpsid i");
     for (;;)
         __asm volatile("wfi");
+    return K_OK; /* not reached */
 }
 
 /* ---- dispatch ----------------------------------------------------------- */

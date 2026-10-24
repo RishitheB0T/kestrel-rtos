@@ -263,7 +263,7 @@ static uint32_t stack_peak(const k_tcb_t *t)
 int32_t k_task_create_internal(const k_task_cfg_t *cfg)
 {
     uint32_t size = cfg->stack_size;
-    if (cfg->prio < K_PRIO_IDLE || cfg->prio > K_PRIO_MAX || size < K_STACK_MIN ||
+    if (cfg->prio > K_PRIO_MAX || size < K_STACK_MIN ||
         size > K_STACK_MAX || (size & (size - 1u)))
         return K_EINVAL;
 
