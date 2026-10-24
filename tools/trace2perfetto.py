@@ -107,11 +107,58 @@ def ascii_chart(hz, names, events, width=72):
     return "\n".join(lines)
 
 
+def to_svg(blocks, titles, width=900):
+    """Render trace blocks as stacked Gantt charts (used for the README)."""
+    colors = {"pi-high": "#d62728", "pi-mid": "#ff7f0e", "pi-low": "#1f77b4"}
+    order = ["pi-high", "pi-mid", "pi-low", "init", "idle"]
+    left, row_h, gap = 90, 22, 4
+    parts, y = [], 10
+    span_ms = max((ev[-1][0] - ev[0][0]) / hz * 1000 for hz, _, ev in blocks)
+    scale = (width - left - 20) / span_ms
+    for (hz, names, events), title in zip(blocks, titles):
+        t0 = events[0][0]
+        parts.append(f'<text x="{left}" y="{y + 14}" font-size="14" font-weight="bold">{title}</text>')
+        y += 24
+        rows = [n for n in order if n in names.values()]
+        row_of = {tid: rows.index(n) for tid, n in names.items() if n in rows}
+        for i, n in enumerate(rows):
+            ry = y + i * (row_h + gap)
+            parts.append(f'<text x="{left - 8}" y="{ry + 15}" font-size="12" text-anchor="end">{n}</text>')
+            parts.append(f'<rect x="{left}" y="{ry}" width="{width - left - 20}" height="{row_h}" fill="#f2f2f2"/>')
+        for tid, a, b in run_slices(events):
+            if tid not in row_of:
+                continue
+            x = left + (a - t0) / hz * 1000 * scale
+            w = max((b - a) / hz * 1000 * scale, 0.8)
+            ry = y + row_of[tid] * (row_h + gap)
+            parts.append(f'<rect x="{x:.1f}" y="{ry}" width="{w:.1f}" height="{row_h}" '
+                         f'fill="{colors.get(names[tid], "#888")}"/>')
+        for ts, ev, tid, arg in events:
+            if ev == EV_MARK and arg == 3:  # H finally gets the mutex
+                x = left + (ts - t0) / hz * 1000 * scale
+                parts.append(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{y - 4}" '
+                             f'y2="{y + len(rows) * (row_h + gap)}" stroke="#d62728" stroke-dasharray="4 3"/>')
+                near_edge = x > width - 260  # put the label left of the line
+                parts.append(f'<text x="{x - 4 if near_edge else x + 4:.1f}" y="{y + 4}" font-size="11" '
+                             f'fill="#d62728" text-anchor="{"end" if near_edge else "start"}">'
+                             f'high-prio task gets the lock at {(ts - t0) / hz * 1000:.1f} ms</text>')
+        y += len(rows) * (row_h + gap) + 6
+        for ms in range(0, int(span_ms) + 1, 10):
+            x = left + ms * scale
+            parts.append(f'<text x="{x:.1f}" y="{y + 10}" font-size="10" text-anchor="middle" fill="#555">{ms} ms</text>')
+        y += 30
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{y}" '
+            f'font-family="Helvetica, Arial, sans-serif">'
+            f'<rect width="100%" height="100%" fill="white"/>' + "".join(parts) + "</svg>")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("log", help="serial log containing one or more #KTRACE blocks")
     ap.add_argument("-o", "--output", help="output JSON (block N>0 gets a .N suffix)")
     ap.add_argument("--quiet", action="store_true", help="no ASCII chart")
+    ap.add_argument("--svg", help="also render all blocks into one SVG timeline")
+    ap.add_argument("--titles", nargs="*", default=[], help="one title per block for --svg")
     args = ap.parse_args()
 
     with open(args.log, errors="replace") as f:
@@ -128,6 +175,11 @@ def main():
             with open(path, "w") as f:
                 json.dump(to_chrome_json(hz, names, events), f)
             print(f"wrote {path}")
+    if args.svg:
+        titles = args.titles + [f"trace {i}" for i in range(len(args.titles), len(blocks))]
+        with open(args.svg, "w") as f:
+            f.write(to_svg([(hz, n, unwrap(e)) for hz, n, e in blocks], titles))
+        print(f"wrote {args.svg}")
 
 
 if __name__ == "__main__":
