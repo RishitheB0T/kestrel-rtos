@@ -1,0 +1,4 @@
+# Only needed to retrain/regenerate the model (make model) and run host tests.
+# The firmware itself builds without Python packages.
+numpy>=1.24
+scikit-learn>=1.2
