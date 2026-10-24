@@ -545,6 +545,7 @@ static int test_cpu_accounting(void)
     k_task_info_t info;
     int t = spawn("acct", wall_spinner, 0, PRIO_INIT - 1, 512);
     CHECK(t >= 0);
+    k_sleep(40); /* sleep, don't poll: the spinner should have the CPU alone */
     CHECK(wait_task_dead(t, 1000, &info) == K_OK);
     uint32_t ms = info.run_cycles_lo / (k_cpu_hz() / 1000u);
     k_printf("    task spun for 30 ms of wall time; kernel charged it %u ms of CPU\n", (unsigned)ms);
