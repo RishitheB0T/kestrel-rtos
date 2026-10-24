@@ -45,8 +45,10 @@ void nn_maxpool2x2(const int8_t *in, int8_t *out, int h, int w, int c);
  * arithmetic is used by the Python reference (tools/nn/intref.py). */
 static inline int32_t nn_requant(int32_t acc, int32_t mult, int32_t shift)
 {
-    int64_t prod = (int64_t)acc * mult;
-    return (int32_t)((prod + ((int64_t)1 << (shift - 1))) >> shift);
+    int64_t t = (int64_t)acc * mult + ((int64_t)1 << (shift - 1));
+    if (shift >= 32) /* the usual case: floor(t / 2^32), then a 32-bit shift */
+        return (int32_t)(t >> 32) >> (shift - 32); /* t >> 32 = high word, free */
+    return (int32_t)(t >> shift);
 }
 
 #endif
