@@ -10,6 +10,7 @@
 #include "kernel.h"
 
 #define RCC_AHB1ENR REG32(0x40023830u)
+#define DBGMCU_CR   REG32(0xE0042004u)
 
 /* Configure the board LED pin as an output. Only the kernel can do this
  * (it needs the RCC clock registers); afterwards a task holding a grant
@@ -27,6 +28,11 @@ static void led_init(void)
 
 int main(void)
 {
+#ifndef BOARD_QEMU
+    /* Keep the debug port clocked while the idle task sleeps in WFI, so the
+     * ST-LINK can still connect and reflash a running board. */
+    DBGMCU_CR |= 0x7u; /* DBG_SLEEP | DBG_STOP | DBG_STANDBY */
+#endif
     k_console_init();
     kprintf("\n\nKestrel RTOS - %s, %u MHz\n", BOARD_NAME, (unsigned)(CPU_HZ / 1000000u));
 
@@ -40,7 +46,7 @@ int main(void)
         .name = "init",
         .entry = app_init,
         .prio = 10,
-        .stack_size = 2048,
+        .stack_size = 4096,         /* the shell's `ps` keeps 16 records */
         .grant_base = LED_GPIO_BASE, /* init may toggle the LED and pass */
         .grant_size = 0x400,         /* this right on to its children    */
     };
