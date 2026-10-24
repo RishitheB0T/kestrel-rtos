@@ -1,22 +1,40 @@
-#include "kestrel.h"
+/*
+ * app.c - the first user task ("init"). It runs unprivileged and builds
+ * the rest of the system with system calls.
+ */
+#include "app.h"
+#include "board.h"
 
-static void worker(void *arg)
+/* Blink the board LED. This task holds an MPU grant for the LED's GPIO
+ * port (inherited from init), so it may write those registers directly,
+ * but nothing else on the bus. */
+static void heartbeat(void *arg)
 {
-    for (int i = 0; i < 3; i++) {
-        k_printf("%s: tick %u\n", (const char *)arg, (unsigned)k_ticks());
-        k_sleep(10);
+    (void)arg;
+    volatile uint32_t *bsrr = (volatile uint32_t *)(LED_GPIO_BASE + 0x18u);
+    const uint32_t on = 1u << (LED_PIN + (LED_ACTIVE_LOW ? 16u : 0u));
+    const uint32_t off = 1u << (LED_PIN + (LED_ACTIVE_LOW ? 0u : 16u));
+    for (;;) {
+        *bsrr = on;
+        k_sleep(100);
+        *bsrr = off;
+        k_sleep(900);
     }
 }
 
 void app_init(void *arg)
 {
     (void)arg;
-    k_printf("init: hello from an unprivileged task (id %d)\n", k_task_self());
-    k_task_cfg_t a = {.name = "A", .entry = worker, .arg = "A", .prio = 5, .stack_size = 1024};
-    k_task_cfg_t b = {.name = "B", .entry = worker, .arg = "B", .prio = 5, .stack_size = 1024};
-    k_printf("create A -> %d\n", k_task_create(&a));
-    k_printf("create B -> %d\n", k_task_create(&b));
-    k_sleep(100);
-    k_printf("init: done\n");
-    k_halt(0);
+    static const k_task_cfg_t hb = {
+        .name = "heartbeat", .entry = heartbeat, .prio = PRIO_HEARTBEAT, .stack_size = 512,
+        .grant_base = LED_GPIO_BASE, .grant_size = 0x400,
+    };
+    k_task_create(&hb);
+
+#ifdef KESTREL_AUTOTEST
+    int failures = run_test_suite();
+    k_halt(failures ? 1 : 0);
+#else
+    shell_main();
+#endif
 }
