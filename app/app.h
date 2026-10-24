@@ -37,7 +37,7 @@ void trace_dump(void);
 typedef struct {
     uint32_t cycles_per_inference[3];
     int mismatches[3];
-    int correct, total;
+    int correct, total, timed;
 } nn_bench_t;
 
 void nn_bench(nn_bench_t *b);

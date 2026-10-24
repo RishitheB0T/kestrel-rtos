@@ -177,6 +177,7 @@ void shell_main(void)
         }
         else if (!strcmp(cmd, "bench")) {
             nn_bench_t b;
+            k_printf("running (about 15 s at 16 MHz)...\n");
             nn_bench(&b);
             nn_print_bench(&b);
         } else if (!strcmp(cmd, "test"))

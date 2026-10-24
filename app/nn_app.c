@@ -18,24 +18,35 @@ static int argmax(const int8_t *v, int n)
     return best;
 }
 
-/* Run every test image through every kernel variant. Timing uses this
- * task's own CPU time, so preemption by other tasks is not counted. */
+/* Timing: the first NN_TIMING_IMAGES images through each kernel variant
+ * (the naive one is slow at 16 MHz). Accuracy: every test image through
+ * the fast kernel. Outputs are always compared with the Python golden
+ * logits. Timing uses this task's own CPU time, so preemption by other
+ * tasks is not counted. */
+#define NN_TIMING_IMAGES 32
+
 void nn_bench(nn_bench_t *b)
 {
     int8_t logits[MODEL_NUM_CLASSES];
+    int n = model_test_count < NN_TIMING_IMAGES ? model_test_count : NN_TIMING_IMAGES;
 
     memset(b, 0, sizeof(*b));
     b->total = model_test_count;
+    b->timed = n;
     for (int impl = 0; impl < NN_NUM_IMPLS; impl++) {
         uint32_t t0 = k_cpu_cycles();
-        for (int i = 0; i < model_test_count; i++) {
+        for (int i = 0; i < n; i++) {
             model_run(model_test_images[i], logits, (nn_impl_t)impl);
             if (memcmp(logits, model_test_logits[i], sizeof(logits)) != 0)
                 b->mismatches[impl]++;
-            if (impl == NN_TILED && argmax(logits, MODEL_NUM_CLASSES) == model_test_labels[i])
-                b->correct++;
         }
-        b->cycles_per_inference[impl] = (k_cpu_cycles() - t0) / (uint32_t)model_test_count;
+        b->cycles_per_inference[impl] = (k_cpu_cycles() - t0) / (uint32_t)n;
+    }
+    for (int i = 0; i < model_test_count; i++) {
+        model_run(model_test_images[i], logits, NN_TILED);
+        if (memcmp(logits, model_test_logits[i], sizeof(logits)) != 0)
+            b->mismatches[NN_TILED]++;
+        b->correct += argmax(logits, MODEL_NUM_CLASSES) == model_test_labels[i];
     }
 }
 
@@ -54,8 +65,8 @@ static uint32_t to_units(uint32_t c) { return c; }
 void nn_print_bench(const nn_bench_t *b)
 {
     uint32_t base = to_units(b->cycles_per_inference[NN_NAIVE]);
-    k_printf("int8 CNN, %u MACs/inference, %d test images, arena %u bytes\n",
-             (unsigned)MODEL_MACS, b->total, (unsigned)MODEL_ARENA_BYTES);
+    k_printf("int8 CNN, %u MACs/inference, arena %u bytes; timed on %d images\n",
+             (unsigned)MODEL_MACS, (unsigned)MODEL_ARENA_BYTES, b->timed);
     k_printf("  %-12s %10s/inf %8s %10s %8s %s\n", "kernel", UNIT_NAME, "per MAC", "time/inf",
              "speedup", "bit-exact");
     for (int i = 0; i < NN_NUM_IMPLS; i++) {
@@ -68,7 +79,7 @@ void nn_print_bench(const nn_bench_t *b)
                  (unsigned)(c / (CPU_HZ / 1000000u)), (unsigned)(speed_x100 / 100),
                  (unsigned)(speed_x100 % 100), b->mismatches[i] ? "NO" : "yes");
     }
-    k_printf("  accuracy: %d/%d = %d.%02d%%\n", b->correct, b->total,
+    k_printf("  accuracy on all %d test images: %d/%d = %d.%02d%%\n", b->total, b->correct, b->total,
              b->correct * 100 / b->total, (b->correct * 10000 / b->total) % 100);
 #ifdef BOARD_QEMU
     k_printf("  (QEMU counts instructions, not cycles: run `bench` on a board for cycles)\n");
