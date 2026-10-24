@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install toolchain and QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi qemu-system-arm
+          pip install -r requirements.txt
+
+      - name: Build every board
+        run: |
+          for b in qemu nucleo_f4 disco_f407 blackpill; do make BOARD=$b; done
+
+      - name: Host tests on the committed model (NN kernels with ASan/UBSan, memory planner)
+        run: make host-test
+
+      - name: Model compiler runs end to end (re-quantize + regenerate C, then re-test)
+        run: |
+          python3 tools/nn/compile_model.py
+          make host-test
+
+      - name: On-target test suite in QEMU
+        run: make test
+
+      - name: Upload scheduler traces (open in ui.perfetto.dev)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: traces-and-log
+          path: |
+            build/test.log
+            build/trace.*.json
