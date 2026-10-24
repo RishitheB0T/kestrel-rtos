@@ -39,26 +39,39 @@ void nn_bench(nn_bench_t *b)
     }
 }
 
+#ifdef BOARD_QEMU
+/* QEMU runs with -icount shift=0: 1 instruction = 1 ns of virtual time,
+ * while SysTick (our clock) counts at 168 MHz. So instructions executed =
+ * cycles * 1000 / 168. QEMU does not model pipeline timing, so this is an
+ * exact instruction count, not a cycle count. */
+#define UNIT_NAME "instructions"
+static uint32_t to_units(uint32_t c) { return (uint32_t)((uint64_t)c * 1000u / 168u); }
+#else
+#define UNIT_NAME "cycles"
+static uint32_t to_units(uint32_t c) { return c; }
+#endif
+
 void nn_print_bench(const nn_bench_t *b)
 {
-    uint32_t base = b->cycles_per_inference[NN_NAIVE];
+    uint32_t base = to_units(b->cycles_per_inference[NN_NAIVE]);
     k_printf("int8 CNN, %u MACs/inference, %d test images, arena %u bytes\n",
              (unsigned)MODEL_MACS, b->total, (unsigned)MODEL_ARENA_BYTES);
-    k_printf("  %-12s %12s %10s %9s %8s %s\n", "kernel", "cycles/inf", "us/inf", "MAC/cyc",
+    k_printf("  %-12s %10s/inf %8s %10s %8s %s\n", "kernel", UNIT_NAME, "per MAC", "time/inf",
              "speedup", "bit-exact");
     for (int i = 0; i < NN_NUM_IMPLS; i++) {
         uint32_t c = b->cycles_per_inference[i];
-        uint32_t mac_per_cyc_x100 = (uint32_t)((uint64_t)MODEL_MACS * 100u / (c ? c : 1));
-        uint32_t speed_x100 = (uint32_t)((uint64_t)base * 100u / (c ? c : 1));
-        k_printf("  %-12s %12u %10u %6u.%02u %5u.%02ux %s\n", impl_names[i], (unsigned)c,
-                 (unsigned)(c / (CPU_HZ / 1000000u)), (unsigned)(mac_per_cyc_x100 / 100),
-                 (unsigned)(mac_per_cyc_x100 % 100), (unsigned)(speed_x100 / 100),
+        uint32_t u = to_units(c);
+        uint32_t per_mac_x100 = (uint32_t)((uint64_t)u * 100u / MODEL_MACS);
+        uint32_t speed_x100 = (uint32_t)((uint64_t)base * 100u / (u ? u : 1));
+        k_printf("  %-12s %16u %5u.%02u %7u us %5u.%02ux %s\n", impl_names[i], (unsigned)u,
+                 (unsigned)(per_mac_x100 / 100), (unsigned)(per_mac_x100 % 100),
+                 (unsigned)(c / (CPU_HZ / 1000000u)), (unsigned)(speed_x100 / 100),
                  (unsigned)(speed_x100 % 100), b->mismatches[i] ? "NO" : "yes");
     }
     k_printf("  accuracy: %d/%d = %d.%02d%%\n", b->correct, b->total,
              b->correct * 100 / b->total, (b->correct * 10000 / b->total) % 100);
 #ifdef BOARD_QEMU
-    k_printf("  note: QEMU is not cycle-accurate; run on a real board for true cycle counts.\n");
+    k_printf("  (QEMU counts instructions, not cycles: run `bench` on a board for cycles)\n");
 #endif
 }
 
