@@ -106,16 +106,20 @@ static void cmd_crash(const char *arg)
 
 static void cmd_help(void)
 {
-    k_printf("commands:\n"
-             "  ps               tasks, stack high-water marks, CPU usage\n"
-             "  pi [on|off]      priority inversion experiment (default: both)\n"
-             "  crash <kind>     run a task that faults; the kernel kills only it\n"
-             "  nn               classify a few digits (ASCII art)\n"
-             "  bench            time the 3 NN kernels on all test images\n"
-             "  test             run the full on-target test suite\n"
-             "  trace            dump the last trace capture (for trace2perfetto.py)\n"
-             "  uptime           time since boot\n"
-             "  reboot           reset the board\n");
+    static const char *const lines[] = {
+        "  ps               tasks, stack high-water marks, CPU usage",
+        "  pi [on|off]      priority inversion experiment (default: both)",
+        "  crash <kind>     run a task that faults; the kernel kills only it",
+        "  nn               classify a few digits (ASCII art)",
+        "  bench            time the 3 NN kernels on all test images",
+        "  test             run the full on-target test suite",
+        "  trace            dump the last trace capture (for trace2perfetto.py)",
+        "  uptime           time since boot",
+        "  reboot           reset the board",
+    };
+    k_printf("commands:\n");
+    for (unsigned i = 0; i < sizeof(lines) / sizeof(lines[0]); i++)
+        k_printf("%s\n", lines[i]);
 }
 
 static int read_line(char *buf, int size)
