@@ -75,15 +75,22 @@ void nn_print_bench(const nn_bench_t *b)
 #endif
 }
 
-/* Print a few test digits as ASCII art with the network's answer. */
+/* Print some test digits as ASCII art with the network's answer, picking
+ * images with different labels so the demo is not all one digit. */
 void nn_demo(int count)
 {
     static const char shades[] = " .:-=+*#%@";
     int8_t logits[MODEL_NUM_CLASSES];
+    int shown = 0;
 
-    for (int i = 0; i < count && i < model_test_count; i++) {
+    for (int i = 0; i < model_test_count && shown < count; i++) {
+        if (shown < MODEL_NUM_CLASSES && model_test_labels[i] != (shown * 7 + 3) % 10)
+            continue; /* labels 3, 0, 7, 4, 1, 8, 5, 2, 9, 6 */
         const int8_t *img = model_test_images[i];
+        uint32_t t0 = k_cpu_cycles();
         model_run(img, logits, NN_TILED);
+        uint32_t dt = k_cpu_cycles() - t0;
+        int pred = argmax(logits, MODEL_NUM_CLASSES);
         for (int y = 0; y < 8; y++) {
             char row[20];
             for (int x = 0; x < 8; x++) {
@@ -92,12 +99,21 @@ void nn_demo(int count)
             }
             row[16] = '\0';
             if (y == 3)
-                k_printf("  |%s|   predicted %d, label %d %s\n", row,
-                         argmax(logits, MODEL_NUM_CLASSES), model_test_labels[i],
-                         argmax(logits, MODEL_NUM_CLASSES) == model_test_labels[i] ? "" : "<-- wrong");
+                k_printf("  |%s|   predicted %d (label %d)%s\n", row, pred, model_test_labels[i],
+                         pred == model_test_labels[i] ? "" : "  <-- wrong");
+            else if (y == 4)
+                k_printf("  |%s|   %u us at %u MHz%s\n", row, (unsigned)(dt / (CPU_HZ / 1000000u)),
+                         (unsigned)(CPU_HZ / 1000000u),
+#ifdef BOARD_QEMU
+                         " (QEMU virtual time)"
+#else
+                         ""
+#endif
+                );
             else
                 k_printf("  |%s|\n", row);
         }
         k_printf("\n");
+        shown++;
     }
 }

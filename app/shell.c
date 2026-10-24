@@ -110,7 +110,7 @@ static void cmd_help(void)
         "  ps               tasks, stack high-water marks, CPU usage",
         "  pi [on|off]      priority inversion experiment (default: both)",
         "  crash <kind>     run a task that faults; the kernel kills only it",
-        "  nn               classify a few digits (ASCII art)",
+        "  nn [count]       classify some test digits (shown as ASCII art)",
         "  bench            time the 3 NN kernels on all test images",
         "  test             run the full on-target test suite",
         "  trace            dump the last trace capture (for trace2perfetto.py)",
@@ -169,8 +169,12 @@ void shell_main(void)
             cmd_pi(arg);
         else if (!strcmp(cmd, "crash"))
             cmd_crash(arg);
-        else if (!strcmp(cmd, "nn"))
-            nn_demo(3);
+        else if (!strcmp(cmd, "nn")) {
+            int n = 0;
+            for (const char *c = arg; *c >= '0' && *c <= '9'; c++)
+                n = n * 10 + (*c - '0');
+            nn_demo(n ? n : 4);
+        }
         else if (!strcmp(cmd, "bench")) {
             nn_bench_t b;
             nn_bench(&b);
