@@ -22,11 +22,17 @@ def main():
     ap.add_argument("--timeout", type=float, default=300)
     ap.add_argument("--log", default="build/test.log")
     ap.add_argument("--trace-json", help="write Perfetto JSON for each trace block")
+    ap.add_argument("--no-icount", action="store_true",
+                    help="run at full speed instead of counting instructions (timings vary)")
     args = ap.parse_args()
 
     cmd = [args.qemu, "-M", "netduinoplus2", "-display", "none", "-monitor", "none",
            "-serial", "null", "-serial", "stdio",
            "-semihosting-config", "enable=on,target=native", "-kernel", args.elf]
+    if not args.no_icount:
+        # Virtual time advances exactly 1 ns per instruction: timings become
+        # repeatable, and the firmware can report exact instruction counts.
+        cmd += ["-icount", "shift=0"]
     os.makedirs(os.path.dirname(os.path.abspath(args.log)), exist_ok=True)
     start = time.time()
     lines = []

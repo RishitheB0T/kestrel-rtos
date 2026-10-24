@@ -47,7 +47,9 @@ LDLIBS := -lgcc
 SRCS := $(wildcard kernel/*.c kernel/*.S lib/*.c nn/*.c app/*.c app/*.S)
 OBJS := $(patsubst %,$(BUILD)/%.o,$(SRCS))
 
-QEMU_FLAGS := -M netduinoplus2 -display none -serial null \
+# -icount shift=0: one emulated instruction = 1 ns of virtual time, which
+# makes timing repeatable and lets the firmware report instruction counts.
+QEMU_FLAGS := -M netduinoplus2 -display none -serial null -icount shift=0 \
               -semihosting-config enable=on,target=native
 
 .PHONY: all run test host-test model flash size clean
